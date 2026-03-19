@@ -16,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
   String? _errorText;
 
   @override
@@ -27,156 +28,136 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorText = null;
-    });
-
+    setState(() { _isLoading = true; _errorText = null; });
     try {
       await FirebaseService.instance.loginWithEmailPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorText = _toFriendlyAuthError(e);
-      });
+      setState(() => _errorText = _toFriendlyAuthError(e));
     } catch (e) {
-      setState(() {
-        _errorText = 'Dang nhap that bai: $e';
-      });
+      setState(() => _errorText = 'Đăng nhập thất bại: $e');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _loginWithGoogle() async {
-    setState(() {
-      _isLoading = true;
-      _errorText = null;
-    });
-
+    setState(() { _isLoading = true; _errorText = null; });
     try {
       await FirebaseService.instance.signInWithGoogle();
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorText = _toFriendlyAuthError(e);
-      });
     } catch (e) {
-      setState(() {
-        _errorText = 'Dang nhap Google that bai: $e';
-      });
+      setState(() => _errorText = 'Lỗi đăng nhập Google: $e');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   String _toFriendlyAuthError(FirebaseAuthException e) {
     switch (e.code) {
-      case 'configuration-not-found':
-        return 'Dang nhap that bai: Firebase Auth chua duoc cau hinh tren project.';
-      case 'operation-not-allowed':
-        return 'Dang nhap that bai: Phuong thuc dang nhap nay chua duoc bat.';
-      case 'user-not-found':
-        return 'Dang nhap that bai: Khong tim thay tai khoan.';
-      case 'wrong-password':
-      case 'invalid-credential':
-        return 'Dang nhap that bai: Sai email hoac mat khau.';
-      case 'invalid-email':
-        return 'Dang nhap that bai: Email khong hop le.';
-      default:
-        return 'Dang nhap that bai: [${e.code}] ${e.message ?? 'Khong xac dinh'}';
+      case 'user-not-found': return 'Tài khoản không tồn tại.';
+      case 'wrong-password': return 'Sai mật khẩu.';
+      default: return 'Lỗi: ${e.message}';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Dang nhap')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (value) {
-                      final text = value?.trim() ?? '';
-                      if (text.isEmpty) return 'Nhap email';
-                      if (!text.contains('@')) return 'Email khong hop le';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Mat khau'),
-                    validator: (value) {
-                      final text = value?.trim() ?? '';
-                      if (text.isEmpty) return 'Nhap mat khau';
-                      if (text.length < 6) return 'Mat khau toi thieu 6 ky tu';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  if (_errorText != null)
-                    Text(
-                      _errorText!,
-                      style: const TextStyle(color: Colors.red),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [theme.colorScheme.primaryContainer, theme.colorScheme.surface],
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.school_rounded, size: 64, color: theme.colorScheme.primary),
+                        const SizedBox(height: 16),
+                        Text('Chào mừng trở lại', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 32),
+
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          validator: (v) => (v == null || !v.contains('@')) ? 'Email không hợp lệ' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          decoration: InputDecoration(
+                            labelText: 'Mật khẩu',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            ),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          validator: (v) => (v == null || v.length < 6) ? 'Mật khẩu tối thiểu 6 ký tự' : null,
+                        ),
+
+                        if (_errorText != null) ...[
+                          const SizedBox(height: 16),
+                          Text(_errorText!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                        ],
+
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity, height: 50,
+                          child: FilledButton(
+                            onPressed: _isLoading ? null : _login,
+                            style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                            child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('ĐĂNG NHẬP'),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+                        const Row(children: [Expanded(child: Divider()), Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('HOẶC')), Expanded(child: Divider())]),
+                        const SizedBox(height: 16),
+
+                        // Nút Đăng nhập bằng Google
+                        SizedBox(
+                          width: double.infinity, height: 50,
+                          child: OutlinedButton.icon(
+                            onPressed: _isLoading ? null : _loginWithGoogle,
+                            icon: Image.network('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1200px-Google_%22G%22_logo.svg.png', height: 20),
+                            label: const Text('Tiếp tục với Google'),
+                            style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+                        TextButton(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                          child: const Text('Chưa có tài khoản? Đăng ký ngay'),
+                        ),
+                      ],
                     ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _isLoading ? null : _login,
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Dang nhap'),
-                    ),
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _loginWithGoogle,
-                      icon: const Icon(Icons.account_circle_outlined),
-                      label: const Text('Dang nhap voi Google'),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const RegisterScreen(),
-                              ),
-                            );
-                          },
-                    child: const Text('Chua co tai khoan? Dang ky'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
