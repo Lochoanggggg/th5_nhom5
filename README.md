@@ -46,6 +46,28 @@ flutter pub get
 flutter run
 ```
 
+## Day len GitHub khong lo key
+
+Project da duoc cau hinh de KHONG track cac file nhay cam:
+
+- `lib/firebase_options.dart`
+- `android/app/google-services.json`
+- `ios/Runner/GoogleService-Info.plist`
+
+Neu file da tung bi track truoc do, chay mot lan:
+
+```bash
+git rm --cached lib/firebase_options.dart
+git rm --cached android/app/google-services.json
+git rm --cached ios/Runner/GoogleService-Info.plist
+```
+
+Sau do commit va push binh thuong. Moi thanh vien clone repo se tu chay lai:
+
+```bash
+flutterfire configure --project=<your-project-id>
+```
+
 ## Phan quyen admin/user
 
 - Khi dang ky moi, user duoc gan role mac dinh la `user`.
