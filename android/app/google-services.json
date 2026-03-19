@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "309598755648",
+    "project_id": "th5-mobile",
+    "storage_bucket": "th5-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:309598755648:android:cbda076ae93356490ef8a5",
+        "android_client_info": {
+          "package_name": "com.example.th5_nhom5"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3mGcpGa9qBM2bBlaVRSezjRXX_dqqtY4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
