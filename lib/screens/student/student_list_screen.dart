@@ -138,7 +138,7 @@ class _StudentListScreenState extends State<StudentListScreen> {
       builder: (ctx) {
         return AlertDialog(
           title: const Text('Xác nhận xóa'),
-          content: Text('Bạn có chắc muốn xóa ${student.fullName}?'),
+          content: Text('Bạn có chắc muốn xóa ${student.fullName} không?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
@@ -157,6 +157,10 @@ class _StudentListScreenState extends State<StudentListScreen> {
 
     try {
       await _service.deleteStudent(student.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Xóa sinh viên thành công')),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -190,7 +194,7 @@ class _StudentListScreenState extends State<StudentListScreen> {
                 );
               },
               icon: const Icon(Icons.add),
-              label: const Text('Thêm SV'),
+              label: const Text('Thêm sinh viên'),
             )
           : null,
       body: Column(
@@ -345,7 +349,7 @@ class _StudentListScreenState extends State<StudentListScreen> {
                                         ),
                                       ],
                                       decoration: const InputDecoration(
-                                        labelText: 'GPA min',
+                                        labelText: 'GPA tối thiểu',
                                         border: OutlineInputBorder(),
                                         isDense: true,
                                       ),
@@ -367,7 +371,7 @@ class _StudentListScreenState extends State<StudentListScreen> {
                                         ),
                                       ],
                                       decoration: const InputDecoration(
-                                        labelText: 'GPA max',
+                                        labelText: 'GPA tối đa',
                                         border: OutlineInputBorder(),
                                         isDense: true,
                                       ),
@@ -444,10 +448,19 @@ class _StudentListScreenState extends State<StudentListScreen> {
                             const Divider(height: 1, thickness: 1),
                         itemBuilder: (context, index) {
                           final student = students[index];
+                          String initials() {
+                            final parts = student.fullName.split(' ');
+                            if (parts.isEmpty) return '';
+                            return parts.map((p) => p.isNotEmpty ? p[0] : '').take(2).join().toUpperCase();
+                          }
+
                           return ListTile(
+                            leading: CircleAvatar(
+                              child: Text(initials()),
+                            ),
                             title: Text(student.fullName),
                             subtitle: Text(
-                              'MSV: ${student.studentId} | Khoa: ${student.department} | Lớp: ${student.className} | GPA: ${student.gpa.toStringAsFixed(2)}',
+                              'Mã SV: ${student.studentId} | Khoa: ${student.department} | Lớp: ${student.className} | GPA: ${student.gpa.toStringAsFixed(2)}',
                             ),
                             trailing: _isAdmin
                                 ? Wrap(
