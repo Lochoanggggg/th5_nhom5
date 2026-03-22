@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 
-import '../../services/firebase_service.dart';
+import '../../viewmodels/auth_view_model.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,9 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoading = false;
   bool _obscurePassword = true;
-  String? _errorText;
 
   @override
   void dispose() {
@@ -28,43 +26,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _isLoading = true; _errorText = null; });
-    try {
-      await FirebaseService.instance.loginWithEmailPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() => _errorText = _toFriendlyAuthError(e));
-    } catch (e) {
-      setState(() => _errorText = 'Đăng nhập thất bại: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    final authViewModel = context.read<AuthViewModel>();
+    await authViewModel.loginWithEmailPassword(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
   }
 
   Future<void> _loginWithGoogle() async {
-    setState(() { _isLoading = true; _errorText = null; });
-    try {
-      await FirebaseService.instance.signInWithGoogle();
-    } catch (e) {
-      setState(() => _errorText = 'Lỗi đăng nhập Google: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  String _toFriendlyAuthError(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'user-not-found': return 'Tài khoản không tồn tại.';
-      case 'wrong-password': return 'Sai mật khẩu.';
-      default: return 'Lỗi: ${e.message}';
-    }
+    final authViewModel = context.read<AuthViewModel>();
+    await authViewModel.signInWithGoogle();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authViewModel = context.watch<AuthViewModel>();
+    final isLoading = authViewModel.isActionLoading;
+    final errorText = authViewModel.errorMessage;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -119,18 +99,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           validator: (v) => (v == null || v.length < 6) ? 'Mật khẩu tối thiểu 6 ký tự' : null,
                         ),
 
-                        if (_errorText != null) ...[
+                        if (errorText != null) ...[
                           const SizedBox(height: 16),
-                          Text(_errorText!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                          Text(errorText, style: const TextStyle(color: Colors.red, fontSize: 13)),
                         ],
 
                         const SizedBox(height: 24),
                         SizedBox(
                           width: double.infinity, height: 50,
                           child: FilledButton(
-                            onPressed: _isLoading ? null : _login,
+                            onPressed: isLoading ? null : _login,
                             style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                            child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('ĐĂNG NHẬP'),
+                            child: isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('ĐĂNG NHẬP'),
                           ),
                         ),
 
@@ -142,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         SizedBox(
                           width: double.infinity, height: 50,
                           child: OutlinedButton.icon(
-                            onPressed: _isLoading ? null : _loginWithGoogle,
+                            onPressed: isLoading ? null : _loginWithGoogle,
                             icon: Image.network('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1200px-Google_%22G%22_logo.svg.png', height: 20),
                             label: const Text('Tiếp tục với Google'),
                             style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),

@@ -1,10 +1,12 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/student/student_list_screen.dart';
-import 'services/firebase_service.dart';
+import 'viewmodels/auth_view_model.dart';
+import 'viewmodels/student_view_model.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,14 +25,29 @@ class StudentManagerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Student Manager',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthViewModel>(
+          create: (_) => AuthViewModel(),
+        ),
+        ChangeNotifierProxyProvider<AuthViewModel, StudentViewModel>(
+          create: (_) => StudentViewModel(),
+          update: (_, auth, student) {
+            final model = student ?? StudentViewModel();
+            model.bindAuth(auth);
+            return model;
+          },
+        ),
+      ],
+      child: MaterialApp(
+        title: 'Student Manager',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+          useMaterial3: true,
+        ),
+        home: const AuthGate(),
       ),
-      home: const AuthGate(),
     );
   }
 }
@@ -40,16 +57,15 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: FirebaseService.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+    return Consumer<AuthViewModel>(
+      builder: (context, authViewModel, _) {
+        if (authViewModel.isAuthStateLoading) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        if (snapshot.data != null) {
+        if (authViewModel.isAuthenticated) {
           return const StudentListScreen();
         }
 

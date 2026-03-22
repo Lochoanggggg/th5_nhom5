@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/student_model.dart';
 import '../../services/firebase_service.dart';
+import '../../viewmodels/student_view_model.dart';
 
 class AddStudentScreen extends StatefulWidget {
   const AddStudentScreen({super.key, this.existingStudent});
@@ -22,7 +24,6 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   late final TextEditingController _departmentController;
   late final TextEditingController _gpaController;
   late final TextEditingController _emailController;
-  bool _isSaving = false;
   String? _errorText;
 
   @override
@@ -60,7 +61,6 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
-      _isSaving = true;
       _errorText = null;
     });
 
@@ -79,14 +79,14 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       updatedAt: now,
     );
 
-    try {
-      if (widget.isEditMode) {
-        await FirebaseService.instance.updateStudent(student);
-      } else {
-        await FirebaseService.instance.addStudent(student);
-      }
+    final viewModel = context.read<StudentViewModel>();
+    final isSuccess = await viewModel.saveStudent(
+      student,
+      isEditMode: widget.isEditMode,
+    );
 
-      if (!mounted) return;
+    if (!mounted) return;
+    if (isSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
@@ -97,34 +97,28 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
         ),
       );
       Navigator.of(context).pop();
-    } catch (e) {
+    } else {
       setState(() {
-        _errorText = 'Lưu dữ liệu thất bại: $e';
+        _errorText = viewModel.errorMessage ?? 'Lưu dữ liệu thất bại';
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
-            content: Text('Lỗi khi lưu dữ liệu: $e'),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.error,
+          content: Text(viewModel.errorMessage ?? 'Lỗi khi lưu dữ liệu'),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final studentViewModel = context.watch<StudentViewModel>();
+    final isSaving = studentViewModel.isLoading;
     
     return Scaffold(
-      backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+      backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       appBar: AppBar(
         title: Text(widget.isEditMode ? 'Sửa sinh viên' : 'Thêm sinh viên'),
         centerTitle: true,
@@ -308,8 +302,8 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                 borderRadius: BorderRadius.circular(16),
                               ),
                             ),
-                            onPressed: _isSaving ? null : _save,
-                            icon: _isSaving
+                            onPressed: isSaving ? null : _save,
+                            icon: isSaving
                                 ? const SizedBox(
                                     width: 20,
                                     height: 20,

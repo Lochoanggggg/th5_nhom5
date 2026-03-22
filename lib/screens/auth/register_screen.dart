@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 
-import '../../services/firebase_service.dart';
+import '../../viewmodels/auth_view_model.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -16,9 +16,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  bool _isLoading = false;
-  bool _obscurePassword = true;
-  String? _errorText;
+  final bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -32,48 +30,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorText = null;
-    });
+    final authViewModel = context.read<AuthViewModel>();
+    final isSuccess = await authViewModel.registerWithEmailPassword(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+      displayName: _nameController.text.trim(),
+    );
 
-    try {
-      await FirebaseService.instance.registerWithEmailPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-        displayName: _nameController.text.trim(),
-      );
-
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorText = _toFriendlyAuthError(e);
-      });
-    } catch (e) {
-      setState(() {
-        _errorText = 'Đăng ký thất bại: $e';
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  String _toFriendlyAuthError(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'email-already-in-use': return 'Email này đã được sử dụng.';
-      case 'invalid-email': return 'Email không hợp lệ.';
-      case 'weak-password': return 'Mật khẩu quá yếu.';
-      default: return 'Lỗi: ${e.message}';
+    if (isSuccess && mounted) {
+      Navigator.of(context).pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authViewModel = context.watch<AuthViewModel>();
+    final isLoading = authViewModel.isActionLoading;
+    final errorText = authViewModel.errorMessage;
 
     return Scaffold(
       appBar: AppBar(
@@ -90,7 +64,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           gradient: LinearGradient(
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
-            colors: [theme.colorScheme.primaryContainer.withOpacity(0.5), theme.colorScheme.surface],
+            colors: [theme.colorScheme.primaryContainer.withValues(alpha: 0.5), theme.colorScheme.surface],
           ),
         ),
         child: Center(
@@ -166,9 +140,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           validator: (v) => (v != _passwordController.text) ? 'Mật khẩu không khớp' : null,
                         ),
                         
-                        if (_errorText != null) ...[
+                        if (errorText != null) ...[
                           const SizedBox(height: 16),
-                          Text(_errorText!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                          Text(errorText, style: const TextStyle(color: Colors.red, fontSize: 13)),
                         ],
                         
                         const SizedBox(height: 32),
@@ -178,12 +152,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           width: double.infinity,
                           height: 56,
                           child: FilledButton(
-                            onPressed: _isLoading ? null : _register,
+                            onPressed: isLoading ? null : _register,
                             style: FilledButton.styleFrom(
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                               backgroundColor: theme.colorScheme.primary,
                             ),
-                            child: _isLoading 
+                            child: isLoading 
                                 ? const CircularProgressIndicator(color: Colors.white) 
                                 : const Text('TẠO TÀI KHOẢN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                           ),
