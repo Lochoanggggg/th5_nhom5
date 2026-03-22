@@ -16,6 +16,8 @@ class FirebaseService {
 
   static const String usersCollection = 'users';
   static const String studentsCollection = 'students';
+  // Maximum GPA used by the app (change to 10.0 if your grading scale is 0-10)
+  static const double maxGpa = 4.0;
 
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 

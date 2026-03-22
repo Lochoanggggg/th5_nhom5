@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/student_model.dart';
 import '../../services/firebase_service.dart';
+import '../../viewmodels/student_view_model.dart';
 
 class AddStudentScreen extends StatefulWidget {
   const AddStudentScreen({super.key, this.existingStudent});
@@ -22,7 +24,6 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   late final TextEditingController _departmentController;
   late final TextEditingController _gpaController;
   late final TextEditingController _emailController;
-  bool _isSaving = false;
   String? _errorText;
 
   @override
@@ -60,7 +61,6 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
-      _isSaving = true;
       _errorText = null;
     });
 
@@ -79,139 +79,253 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       updatedAt: now,
     );
 
-    try {
-      if (widget.isEditMode) {
-        await FirebaseService.instance.updateStudent(student);
-      } else {
-        await FirebaseService.instance.addStudent(student);
-      }
+    final viewModel = context.read<StudentViewModel>();
+    final isSuccess = await viewModel.saveStudent(
+      student,
+      isEditMode: widget.isEditMode,
+    );
 
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
+    if (!mounted) return;
+    if (isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          content: Text(widget.isEditMode
+              ? 'Cập nhật thành công'
+              : 'Thêm sinh viên thành công'),
+        ),
+      );
+      Navigator.of(context).pop();
+    } else {
       setState(() {
-        _errorText = 'Luu du lieu that bai: $e';
+        _errorText = viewModel.errorMessage ?? 'Lưu dữ liệu thất bại';
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.error,
+          content: Text(viewModel.errorMessage ?? 'Lỗi khi lưu dữ liệu'),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final studentViewModel = context.watch<StudentViewModel>();
+    final isSaving = studentViewModel.isLoading;
+    
     return Scaffold(
+      backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       appBar: AppBar(
-        title: Text(widget.isEditMode ? 'Sua sinh vien' : 'Them sinh vien'),
+        title: Text(widget.isEditMode ? 'Sửa sinh viên' : 'Thêm sinh viên'),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 2,
       ),
       body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Form(
-              key: _formKey,
-              child: ListView(
-                children: [
-                  TextFormField(
-                    controller: _studentIdController,
-                    decoration: const InputDecoration(
-                      labelText: 'Ma sinh vien',
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 550),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(color: theme.colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Thông tin cơ bản',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: _studentIdController,
+                          decoration: InputDecoration(
+                            labelText: 'Mã sinh viên',
+                            prefixIcon: const Icon(Icons.badge_outlined),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            filled: true,
+                            fillColor: theme.colorScheme.surface,
+                          ),
+                          validator: (value) {
+                            final text = (value ?? '').trim();
+                            if (text.isEmpty) return 'Vui lòng nhập mã sinh viên';
+                            if (!RegExp(r'^[A-Za-z0-9_-]{3,20}$').hasMatch(text)) {
+                              return 'Mã SV gồm chữ, số, -, _ (3-20 ký tự)';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: _fullNameController,
+                          decoration: InputDecoration(
+                            labelText: 'Họ và tên',
+                            prefixIcon: const Icon(Icons.person_outline),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            filled: true,
+                            fillColor: theme.colorScheme.surface,
+                          ),
+                          validator: (value) {
+                            if ((value ?? '').trim().isEmpty) return 'Vui lòng nhập họ và tên';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 32),
+                        Text(
+                          'Thông tin học tập',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _classNameController,
+                                decoration: InputDecoration(
+                                  labelText: 'Lớp',
+                                  prefixIcon: const Icon(Icons.class_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  filled: true,
+                                  fillColor: theme.colorScheme.surface,
+                                ),
+                                validator: (value) {
+                                  if ((value ?? '').trim().isEmpty) return 'Nhập lớp';
+                                  return null;
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _gpaController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'GPA',
+                                  prefixIcon: const Icon(Icons.grade_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  filled: true,
+                                  fillColor: theme.colorScheme.surface,
+                                ),
+                                validator: (value) {
+                                  final text = (value ?? '').trim();
+                                  if (text.isEmpty) return 'Nhập GPA';
+                                  final gpa = double.tryParse(text);
+                                  if (gpa == null || gpa < 0 || gpa > FirebaseService.maxGpa) {
+                                    return '0 - ${FirebaseService.maxGpa.toStringAsFixed(0)}';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: _departmentController,
+                          decoration: InputDecoration(
+                            labelText: 'Khoa',
+                            prefixIcon: const Icon(Icons.account_balance_outlined),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            filled: true,
+                            fillColor: theme.colorScheme.surface,
+                          ),
+                          validator: (value) {
+                            if ((value ?? '').trim().isEmpty) return 'Vui lòng nhập khoa';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            filled: true,
+                            fillColor: theme.colorScheme.surface,
+                          ),
+                          validator: (value) {
+                            final text = (value ?? '').trim();
+                            if (text.isEmpty) return 'Vui lòng nhập email';
+                            if (!text.contains('@')) return 'Email không hợp lệ';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 32),
+                        if (_errorText != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Text(
+                              _errorText!,
+                              style: TextStyle(color: theme.colorScheme.error),
+                            ),
+                          ),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: isSaving ? null : _save,
+                            icon: isSaving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Icon(widget.isEditMode ? Icons.edit : Icons.add),
+                            label: Text(
+                              widget.isEditMode ? 'CẬP NHẬT' : 'THÊM MỚI',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    validator: (value) {
-                      final text = (value ?? '').trim();
-                      if (text.isEmpty) {
-                        return 'Nhap ma sinh vien';
-                      }
-                      if (!RegExp(r'^[A-Za-z0-9_-]{3,20}$').hasMatch(text)) {
-                        return 'Ma SV gom chu, so, -, _ (3-20 ky tu)';
-                      }
-                      return null;
-                    },
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _fullNameController,
-                    decoration: const InputDecoration(labelText: 'Ho va ten'),
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) {
-                        return 'Nhap ho va ten';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _classNameController,
-                    decoration: const InputDecoration(labelText: 'Lop'),
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) return 'Nhap lop';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _departmentController,
-                    decoration: const InputDecoration(labelText: 'Khoa'),
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) {
-                        return 'Nhap khoa';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _gpaController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'GPA (0-4)'),
-                    validator: (value) {
-                      final text = (value ?? '').trim();
-                      if (text.isEmpty) return 'Nhap GPA';
-                      final gpa = double.tryParse(text);
-                      if (gpa == null || gpa < 0 || gpa > 4) {
-                        return 'GPA phai trong khoang 0 den 4';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (value) {
-                      final text = (value ?? '').trim();
-                      if (text.isEmpty) return 'Nhap email';
-                      if (!text.contains('@')) return 'Email khong hop le';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  if (_errorText != null)
-                    Text(
-                      _errorText!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _isSaving ? null : _save,
-                      child: _isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(widget.isEditMode ? 'Cap nhat' : 'Them moi'),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
